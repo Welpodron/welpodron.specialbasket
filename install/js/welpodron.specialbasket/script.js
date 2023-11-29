@@ -4,7 +4,7 @@
         if (window.welpodron.specialbasket) {
             return;
         }
-        const MODULE_BASE = "specialbasket";
+        const MODULE_BASE = 'specialbasket';
         const EVENT_ADD_BEFORE = `welpodron.${MODULE_BASE}:add:before`;
         const EVENT_ADD_AFTER = `welpodron.${MODULE_BASE}:add:after`;
         const ATTRIBUTE_BASE = `data-w-${MODULE_BASE}`;
@@ -19,23 +19,39 @@
         const ATTRIBUTE_ACTION_ARGS = `${ATTRIBUTE_ACTION}-args`;
         const ATTRIBUTE_ACTION_FLUSH = `${ATTRIBUTE_ACTION}-flush`;
         class SpecialBasket {
-            sessid = "";
+            sessid = '';
             items = new Set();
-            supportedActions = ["add", "set"];
+            supportedActions = ['add', 'set'];
             constructor({ sessid, items, config = {} }) {
                 if (SpecialBasket.instance) {
-                    if (sessid) {
-                        SpecialBasket.instance.sessid = sessid;
+                    if (config.forceSessid) {
+                        if (sessid) {
+                            SpecialBasket.instance.sessid = sessid;
+                        }
                     }
-                    if (Array.isArray(items) && items.length) {
-                        SpecialBasket.instance.items = new Set(items.map((item) => item.toString()));
+                    else {
+                        // if (sessid) {
+                        //   (SpecialBasket as any).instance.sessid = sessid;
+                        // }
+                    }
+                    if (config.forceItems) {
+                        if (Array.isArray(items) && items.length) {
+                            SpecialBasket.instance.items = new Set(items.map((item) => item.toString()));
+                        }
+                    }
+                    else {
+                        // if (Array.isArray(items) && items.length) {
+                        //   (SpecialBasket as any).instance.items = new Set(
+                        //     items.map((item: string) => item.toString())
+                        //   );
+                        // }
                     }
                     return SpecialBasket.instance;
                 }
                 this.setSessid(sessid);
                 this.setItems(items);
-                if (document.readyState === "loading") {
-                    document.addEventListener("DOMContentLoaded", this.handleDocumentLoaded, {
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', this.handleDocumentLoaded, {
                         once: true,
                     });
                 }
@@ -53,7 +69,7 @@
             handleDocumentLoaded = () => {
                 document.querySelectorAll(`[${ATTRIBUTE_LINK}]`).forEach((link) => {
                     if (this.items.size) {
-                        link.setAttribute(ATTRIBUTE_LINK_ACTIVE, "");
+                        link.setAttribute(ATTRIBUTE_LINK_ACTIVE, '');
                     }
                     else {
                         link.removeAttribute(ATTRIBUTE_LINK_ACTIVE);
@@ -101,19 +117,17 @@
                         document
                             .querySelectorAll(`input[name="products[${beforeId}]"][${ATTRIBUTE_INPUT}]`)
                             .forEach((element) => {
-                            const actionArgs = element.getAttribute("name");
+                            const actionArgs = element.getAttribute('name');
                             if (!actionArgs) {
                                 return;
                             }
                             if (!canBuy) {
-                                element?.form?.style?.setProperty("display", "none");
-                                element.setAttribute("disabled", "");
+                                element.setAttribute('disabled', '');
                             }
                             else {
-                                element?.form?.style?.removeProperty("display");
-                                element.removeAttribute("disabled");
+                                element.removeAttribute('disabled');
                             }
-                            element.setAttribute("name", `products[${afterId.toString()}]`);
+                            element.setAttribute('name', `products[${afterId.toString()}]`);
                         });
                     }
                     func.call(this);
@@ -124,12 +138,17 @@
             };
             setItems = (items) => {
                 this.items = new Set(items.map((item) => item.toString()));
-            };
-            addItem = (item) => {
-                this.items.add(item.toString());
-            };
-            removeItem = (item) => {
-                this.items.delete(item.toString());
+                document.querySelectorAll(`[${ATTRIBUTE_LINK}]`).forEach((el) => {
+                    if (this.items.size) {
+                        el.setAttribute(ATTRIBUTE_LINK_ACTIVE, '');
+                    }
+                    else {
+                        el.removeAttribute(ATTRIBUTE_LINK_ACTIVE);
+                    }
+                    el.querySelectorAll(`[${ATTRIBUTE_LINK_COUNTER}]`).forEach((el) => {
+                        el.textContent = this.items.size.toString();
+                    });
+                });
             };
             add = async ({ args, event, }) => {
                 if (!args) {
@@ -137,16 +156,16 @@
                 }
                 const controls = document.querySelectorAll(`[${ATTRIBUTE_CONTROL}][${ATTRIBUTE_ACTION}][${ATTRIBUTE_ACTION_ARGS}="${args}"]`);
                 controls.forEach((control) => {
-                    control.setAttribute("disabled", "");
+                    control.setAttribute('disabled', '');
                 });
                 let data = args instanceof FormData ? args : new FormData();
                 // composite and deep cache fix
                 if (window.BX && window.BX.bitrix_sessid) {
                     this.setSessid(window.BX.bitrix_sessid());
                 }
-                data.set("sessid", this.sessid);
+                data.set('sessid', this.sessid);
                 if (!(args instanceof FormData)) {
-                    let json = "";
+                    let json = '';
                     try {
                         JSON.parse(args);
                         json = args;
@@ -154,7 +173,7 @@
                     catch (_) {
                         json = JSON.stringify(args);
                     }
-                    data.set("args", json);
+                    data.set('args', json);
                 }
                 let dispatchedEvent = new CustomEvent(EVENT_ADD_BEFORE, {
                     bubbles: true,
@@ -164,31 +183,35 @@
                 let responseData = {};
                 let bitrixResponse = null;
                 try {
-                    const response = await fetch("/bitrix/services/main/ajax.php?action=welpodron%3Aspecialbasket.Receiver.add", {
-                        method: "POST",
+                    const response = await fetch('/bitrix/services/main/ajax.php?action=welpodron%3Aspecialbasket.Receiver.add', {
+                        method: 'POST',
                         body: data,
                     });
                     if (!response.ok) {
                         throw new Error(response.statusText);
                     }
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return;
+                    }
                     bitrixResponse = await response.json();
                     if (!bitrixResponse) {
-                        throw new Error("Ожидался другой формат ответа от сервера");
+                        throw new Error('Ожидался другой формат ответа от сервера');
                     }
-                    if (bitrixResponse.status === "error") {
+                    if (bitrixResponse.status === 'error') {
                         console.error(bitrixResponse);
                         const error = bitrixResponse.errors[0];
                         if (!event || !event?.target) {
-                            return;
+                            return bitrixResponse;
                         }
                         const target = event.target.closest(`[${ATTRIBUTE_CONTROL}][${ATTRIBUTE_ACTION}]`);
                         if (!target || !target.parentElement) {
-                            return;
+                            return bitrixResponse;
                         }
                         let div = target.parentElement.querySelector(`[${ATTRIBUTE_RESPONSE}]`);
                         if (!div) {
-                            div = document.createElement("div");
-                            div.setAttribute(ATTRIBUTE_RESPONSE, "");
+                            div = document.createElement('div');
+                            div.setAttribute(ATTRIBUTE_RESPONSE, '');
                             target.parentElement.appendChild(div);
                         }
                         window.welpodron.templater.renderHTML({
@@ -207,8 +230,8 @@
                                 if (target && target.parentElement) {
                                     let div = target.parentElement.querySelector(`[${ATTRIBUTE_RESPONSE}]`);
                                     if (!div) {
-                                        div = document.createElement("div");
-                                        div.setAttribute(ATTRIBUTE_RESPONSE, "");
+                                        div = document.createElement('div');
+                                        div.setAttribute(ATTRIBUTE_RESPONSE, '');
                                         target.parentElement.appendChild(div);
                                     }
                                     window.welpodron.templater.renderHTML({
@@ -224,19 +247,6 @@
                         if (responseData.CURRENT_PRODUCTS) {
                             const currentProductsIds = Object.keys(responseData.CURRENT_PRODUCTS);
                             this.setItems(currentProductsIds);
-                            const links = document.querySelectorAll(`[${ATTRIBUTE_LINK}]`);
-                            links.forEach((link) => {
-                                if (currentProductsIds.length) {
-                                    link.setAttribute(ATTRIBUTE_LINK_ACTIVE, "");
-                                }
-                                else {
-                                    link.removeAttribute(ATTRIBUTE_LINK_ACTIVE);
-                                }
-                                const counters = link.querySelectorAll(`[${ATTRIBUTE_LINK_COUNTER}]`);
-                                counters.forEach((counter) => {
-                                    counter.textContent = currentProductsIds.length.toString();
-                                });
-                            });
                         }
                     }
                 }
@@ -251,7 +261,7 @@
                     });
                     document.dispatchEvent(dispatchedEvent);
                     controls.forEach((control) => {
-                        control.removeAttribute("disabled");
+                        control.removeAttribute('disabled');
                     });
                 }
                 return bitrixResponse;
@@ -262,16 +272,16 @@
                 }
                 const controls = document.querySelectorAll(`[${ATTRIBUTE_CONTROL}][${ATTRIBUTE_ACTION}][${ATTRIBUTE_ACTION_ARGS}="${args}"]`);
                 controls.forEach((control) => {
-                    control.setAttribute("disabled", "");
+                    control.setAttribute('disabled', '');
                 });
                 let data = args instanceof FormData ? args : new FormData();
                 // composite and deep cache fix
                 if (window.BX && window.BX.bitrix_sessid) {
                     this.setSessid(window.BX.bitrix_sessid());
                 }
-                data.set("sessid", this.sessid);
+                data.set('sessid', this.sessid);
                 if (!(args instanceof FormData)) {
-                    let json = "";
+                    let json = '';
                     try {
                         JSON.parse(args);
                         json = args;
@@ -279,7 +289,7 @@
                     catch (_) {
                         json = JSON.stringify(args);
                     }
-                    data.set("args", json);
+                    data.set('args', json);
                 }
                 let dispatchedEvent = new CustomEvent(EVENT_ADD_BEFORE, {
                     bubbles: true,
@@ -289,8 +299,8 @@
                 let responseData = {};
                 let bitrixResponse = null;
                 try {
-                    const response = await fetch("/bitrix/services/main/ajax.php?action=welpodron%3Aspecialbasket.Receiver.set", {
-                        method: "POST",
+                    const response = await fetch('/bitrix/services/main/ajax.php?action=welpodron%3Aspecialbasket.Receiver.set', {
+                        method: 'POST',
                         body: data,
                     });
                     if (!response.ok) {
@@ -298,9 +308,9 @@
                     }
                     bitrixResponse = await response.json();
                     if (!bitrixResponse) {
-                        throw new Error("Ожидался другой формат ответа от сервера");
+                        throw new Error('Ожидался другой формат ответа от сервера');
                     }
-                    if (bitrixResponse.status === "error") {
+                    if (bitrixResponse.status === 'error') {
                         console.error(bitrixResponse);
                         const error = bitrixResponse.errors[0];
                         if (!event || !event?.target) {
@@ -312,8 +322,8 @@
                         }
                         let div = target.parentElement.querySelector(`[${ATTRIBUTE_RESPONSE}]`);
                         if (!div) {
-                            div = document.createElement("div");
-                            div.setAttribute(ATTRIBUTE_RESPONSE, "");
+                            div = document.createElement('div');
+                            div.setAttribute(ATTRIBUTE_RESPONSE, '');
                             target.parentElement.appendChild(div);
                         }
                         window.welpodron.templater.renderHTML({
@@ -332,8 +342,8 @@
                                 if (target && target.parentElement) {
                                     let div = target.parentElement.querySelector(`[${ATTRIBUTE_RESPONSE}]`);
                                     if (!div) {
-                                        div = document.createElement("div");
-                                        div.setAttribute(ATTRIBUTE_RESPONSE, "");
+                                        div = document.createElement('div');
+                                        div.setAttribute(ATTRIBUTE_RESPONSE, '');
                                         target.parentElement.appendChild(div);
                                     }
                                     window.welpodron.templater.renderHTML({
@@ -357,23 +367,12 @@
                             document
                                 .querySelectorAll(`[${ATTRIBUTE_TOTAL_PRICE}]`)
                                 .forEach((el) => {
-                                el.textContent = "-";
+                                el.textContent = '-';
                             });
                         }
                         if (responseData.CURRENT_PRODUCTS) {
                             const currentProductsIds = Object.keys(responseData.CURRENT_PRODUCTS);
                             this.setItems(currentProductsIds);
-                            document.querySelectorAll(`[${ATTRIBUTE_LINK}]`).forEach((el) => {
-                                if (currentProductsIds.length) {
-                                    el.setAttribute(ATTRIBUTE_LINK_ACTIVE, "");
-                                }
-                                else {
-                                    el.removeAttribute(ATTRIBUTE_LINK_ACTIVE);
-                                }
-                                el.querySelectorAll(`[${ATTRIBUTE_LINK_COUNTER}]`).forEach((el) => {
-                                    el.textContent = currentProductsIds.length.toString();
-                                });
-                            });
                         }
                     }
                 }
@@ -388,7 +387,7 @@
                     });
                     document.dispatchEvent(dispatchedEvent);
                     controls.forEach((control) => {
-                        control.removeAttribute("disabled");
+                        control.removeAttribute('disabled');
                     });
                 }
                 return bitrixResponse;

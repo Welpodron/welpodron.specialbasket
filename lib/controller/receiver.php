@@ -37,6 +37,38 @@ class Receiver extends Controller
         ];
     }
 
+    private function loadModules()
+    {
+        if (!Loader::includeModule(self::DEFAULT_MODULE_ID)) {
+            throw new \Exception('Модуль ' . self::DEFAULT_MODULE_ID . ' не удалось подключить');
+        }
+
+        if (!Loader::includeModule('iblock')) {
+            throw new \Exception('Модуль iblock не удалось подключить');
+        }
+
+        if (!Loader::includeModule("catalog")) {
+            throw new \Exception('Модуль catalog не удалось подключить');
+        }
+
+        if (!Loader::includeModule("sale")) {
+            throw new \Exception('Модуль sale не удалось подключить');
+        }
+    }
+
+    private function checkIfIsBot()
+    {
+        if (!_Basket::isNotCrawler()) {
+            throw new \Exception('Поисковые роботы не могут добавлять товары в корзину');
+        }
+
+        if (!$_SERVER['HTTP_USER_AGENT']) {
+            throw new \Exception('Поисковые роботы не могут добавлять позиции в корзину');
+        } elseif (preg_match('/bot|crawl|curl|dataprovider|search|get|spider|find|java|majesticsEO|google|yahoo|teoma|contaxe|yandex|libwww-perl|facebookexternalhit/i', $_SERVER['HTTP_USER_AGENT'])) {
+            throw new \Exception('Поисковые роботы не могут добавлять позиции в корзину');
+        }
+    }
+
     protected function addCookie($code = self::DEFAULT_COOKIE_CODE, $value)
     {
         $cookie = new Cookie($code, Json::encode($value), time() + 60 * 60 * 24 * 7);
@@ -50,21 +82,8 @@ class Receiver extends Controller
         global $APPLICATION;
 
         try {
-            if (!Loader::includeModule(self::DEFAULT_MODULE_ID)) {
-                throw new \Exception('Модуль ' . self::DEFAULT_MODULE_ID . ' не удалось подключить');
-            }
-
-            if (!Loader::includeModule("catalog")) {
-                throw new \Exception('Модуль catalog не удалось подключить');
-            }
-
-            if (!Loader::includeModule("sale")) {
-                throw new \Exception('Модуль sale не удалось подключить');
-            }
-
-            if (!_Basket::isNotCrawler()) {
-                throw new \Exception('Поисковые роботы не могут добавлять товары в корзину');
-            }
+            $this->loadModules();
+            $this->checkIfIsBot();
 
             $request = $this->getRequest();
             $arDataRaw = $request->getPostList()->toArray();
@@ -183,24 +202,15 @@ class Receiver extends Controller
         global $APPLICATION;
 
         try {
-            if (!Loader::includeModule(self::DEFAULT_MODULE_ID)) {
-                throw new \Exception('Модуль ' . self::DEFAULT_MODULE_ID . ' не удалось подключить');
-            }
-
-            if (!Loader::includeModule("catalog")) {
-                throw new \Exception('Модуль catalog не удалось подключить');
-            }
-
-            if (!Loader::includeModule("sale")) {
-                throw new \Exception('Модуль sale не удалось подключить');
-            }
-
-            if (!_Basket::isNotCrawler()) {
-                throw new \Exception('Поисковые роботы не могут добавлять товары в корзину');
-            }
+            $this->loadModules();
+            $this->checkIfIsBot();
 
             $request = $this->getRequest();
             $arDataRaw = $request->getPostList()->toArray();
+
+            if ($arDataRaw['sessid'] !== bitrix_sessid()) {
+                throw new \Exception('Неверный идентификатор сессии');
+            }
 
             $arRequestProducts = $arDataRaw['products'];
 
@@ -225,13 +235,13 @@ class Receiver extends Controller
 
             $this->addCookie(self::DEFAULT_COOKIE_CODE, $arAddedProducts);
 
-            if ($arDataRaw['start'] && $arDataRaw['end']) {
+            if ($arDataRaw['DATE_START'] && $arDataRaw['DATE_END']) {
 
                 try {
                     $currentDate = new DateTime(null, 'Y-m-d', new \DateTimeZone('Europe/Moscow'));
                     $currentDate->setTime(0, 0);
 
-                    $startDate = new DateTime($arDataRaw['start'], 'Y-m-d', new \DateTimeZone('Europe/Moscow'));
+                    $startDate = new DateTime($arDataRaw['DATE_START'], 'Y-m-d', new \DateTimeZone('Europe/Moscow'));
                     $startDate->setTime(0, 0);
 
                     if ($startDate < $currentDate) {
@@ -239,7 +249,7 @@ class Receiver extends Controller
                         return $arResult;
                     }
 
-                    $endDate = new DateTime($arDataRaw['end'], 'Y-m-d', new \DateTimeZone('Europe/Moscow'));
+                    $endDate = new DateTime($arDataRaw['DATE_END'], 'Y-m-d', new \DateTimeZone('Europe/Moscow'));
                     $endDate->setTime(0, 0);
 
                     if ($endDate < $currentDate) {

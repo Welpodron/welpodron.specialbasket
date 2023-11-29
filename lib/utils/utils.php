@@ -14,6 +14,7 @@ class Utils
 
     static public function getBasketItems($cookieCode = self::DEFAULT_COOKIE_CODE)
     {
+        //! Вполне возможно что сервер уже пытается отправить куки в response
         $basket = Context::getCurrent()->getRequest()->getCookie($cookieCode);
 
         if (isset($basket) && !empty($basket)) {
